@@ -9,15 +9,12 @@ import time
 from typing import Tuple, List, Dict
 from sklearn.cluster import KMeans
 
-# Configure Streamlit page
 st.set_page_config(page_title="People and Car Detection App", layout="wide")
 
-# Constants
 MALE_COLOR = (0, 255, 0)
 FEMALE_COLOR = (255, 0, 0)
 CAR_COLOR = (0, 0, 255)
 
-# Define common car colors (in HSV space)
 car_colors: Dict[str, Tuple[List[int], List[int]]] = {
     "White": ([0, 0, 200], [180, 30, 255]),
     "Black": ([0, 0, 0], [180, 255, 30]),
@@ -58,7 +55,6 @@ def load_models() -> Tuple[YOLO, tf.keras.Model]:
 yolo_model, gender_model = load_models()
 
 
-# Define common car colors (in BGR space for drawing)
 car_colors = {
     "White": ([0, 0, 200], [180, 30, 255]),
     "Black": ([0, 0, 0], [180, 255, 30]),
@@ -77,20 +73,16 @@ car_colors = {
 
 @st.cache_data
 def get_car_color(image_rgb: np.ndarray) -> str:
-    # Resize image for faster processing
     resized_image = cv2.resize(image_rgb, (100, 100), interpolation=cv2.INTER_AREA)
     reshaped_image = resized_image.reshape((-1, 3))
 
-    # Apply K-means clustering
     kmeans = KMeans(n_clusters=3, random_state=0).fit(reshaped_image)
     dominant_color = kmeans.cluster_centers_[np.argmax(np.bincount(kmeans.labels_))]
 
-    # Convert dominant color to HSV
     dominant_color_hsv = cv2.cvtColor(np.uint8([[dominant_color]]), cv2.COLOR_RGB2HSV)[
         0
     ][0]
 
-    # Determine the color name by finding the closest color in the predefined dictionary
     color_name = "Unknown"
     min_distance = float("inf")
     for name, (lower, upper) in car_colors.items():
@@ -100,7 +92,6 @@ def get_car_color(image_rgb: np.ndarray) -> str:
             color_name = name
             break
         else:
-            # Calculate Euclidean distance for the closest match
             center_hsv = (np.array(lower) + np.array(upper)) / 2
             distance = np.linalg.norm(center_hsv - dominant_color_hsv)
             if distance < min_distance:
@@ -138,8 +129,7 @@ def process_frame(
 ) -> Tuple[
     List, List[str], List[str], List[np.ndarray], List[str], List[Tuple[int, int, int]]
 ]:
-    results = yolo_model(frame_rgb, classes=[0, 2])  # Only detect persons and cars
-
+    results = yolo_model(frame_rgb, classes=[0, 2])
     genders, car_colors, boxes, labels, colors = [], [], [], [], []
 
     for r in results:
@@ -148,7 +138,7 @@ def process_frame(
             bbox = box.xyxy[0].cpu().numpy().astype(int)
             boxes.append(bbox)
 
-            if cls == 0:  # person
+            if cls == 0:
                 face = frame_rgb[
                     max(0, bbox[1]) : min(frame_rgb.shape[0], bbox[3]),
                     max(0, bbox[0]) : min(frame_rgb.shape[1], bbox[2]),
@@ -158,7 +148,7 @@ def process_frame(
                     genders.append(gender)
                     labels.append(gender)
                     colors.append(MALE_COLOR if gender == "Male" else FEMALE_COLOR)
-            elif cls == 2:  # car
+            elif cls == 2:
                 car_roi = frame_rgb[
                     max(0, bbox[1]) : min(frame_rgb.shape[0], bbox[3]),
                     max(0, bbox[0]) : min(frame_rgb.shape[1], bbox[2]),
@@ -172,7 +162,6 @@ def process_frame(
     return results, genders, car_colors, boxes, labels, colors
 
 
-# Streamlit app
 st.title("People and Car Detection App")
 
 uploaded_file = st.file_uploader(
